@@ -410,6 +410,8 @@ def _get_bin_edges(a, bins, range, weights):
             # Do not call selectors on empty arrays
             width = _hist_bin_selectors[bin_name](a, (first_edge, last_edge))
             if width:
+                if np.issubdtype(a.dtype, np.integer) and width < 1:
+                    width = 1
                 n_equal_bins = int(np.ceil(_unsigned_subtract(last_edge, first_edge) / width))
             else:
                 # Width can be zero for some estimators, e.g. FD when
@@ -624,6 +626,9 @@ def histogram_bin_edges(a, bins=10, range=None, weights=None):
 
         The simplest and fastest estimator. Only takes into account the
         data size.
+
+    Additionally, if the data is of integer dtype, then the binwidth will never
+    be less than 1.
 
     Examples
     --------
@@ -967,7 +972,8 @@ def histogramdd(sample, bins=10, range=None, density=None, weights=None):
 
     Examples
     --------
-    >>> r = np.random.randn(100,3)
+    >>> rng = np.random.default_rng()
+    >>> r = rng.normal(size=(100,3))
     >>> H, edges = np.histogramdd(r, bins = (5, 8, 4))
     >>> H.shape, edges[0].size, edges[1].size, edges[2].size
     ((5, 8, 4), 6, 9, 5)

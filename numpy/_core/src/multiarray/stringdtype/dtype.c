@@ -33,7 +33,6 @@ new_stringdtype_instance(PyObject *na_object, int coerce)
 
     char *default_string_buf = NULL;
     char *na_name_buf = NULL;
-    char array_owned = 0;
 
     npy_string_allocator *allocator = NpyString_new_allocator(PyMem_RawMalloc, PyMem_RawFree,
                                                               PyMem_RawRealloc);
@@ -138,7 +137,7 @@ fail:
     if (na_name_buf != NULL) {
         PyMem_RawFree(na_name_buf);
     }
-    if (allocator != NULL && array_owned != 2) {
+    if (allocator != NULL) {
         NpyString_free_allocator(allocator);
     }
     return NULL;
@@ -416,8 +415,23 @@ fail:
 // PyArray_NonzeroFunc
 // Unicode strings are nonzero if their length is nonzero.
 npy_bool
-nonzero(void *data, void *NPY_UNUSED(arr))
+nonzero(void *data, void *arr)
 {
+    PyArray_StringDTypeObject *descr = (PyArray_StringDTypeObject *)PyArray_DESCR(arr);
+    int has_null = descr->na_object != NULL;
+    int has_nan_na = descr->has_nan_na;
+    int has_string_na = descr->has_string_na;
+    if (has_null && NpyString_isnull((npy_packed_static_string *)data)) {
+        if (!has_string_na) {
+            if (has_nan_na) {
+                // numpy treats NaN as truthy, following python
+                return 1;
+            }
+            else {
+                return 0;
+            }
+        }
+    }
     return NpyString_size((npy_packed_static_string *)data) != 0;
 }
 
@@ -660,7 +674,7 @@ stringdtype_dealloc(PyArray_StringDTypeObject *self)
 {
     Py_XDECREF(self->na_object);
     // this can be null if an error happens while initializing an instance
-    if (self->allocator != NULL && self->array_owned != 2) {
+    if (self->allocator != NULL) {
         NpyString_free_allocator(self->allocator);
     }
     PyMem_RawFree((char *)self->na_name.buf);

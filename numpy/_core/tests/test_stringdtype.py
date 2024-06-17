@@ -40,13 +40,17 @@ def na_object(request):
     return request.param
 
 
-@pytest.fixture()
-def dtype(na_object, coerce):
+def get_dtype(na_object, coerce=True):
     # explicit is check for pd_NA because != with pd_NA returns pd_NA
     if na_object is pd_NA or na_object != "unset":
         return StringDType(na_object=na_object, coerce=coerce)
     else:
         return StringDType(coerce=coerce)
+
+
+@pytest.fixture()
+def dtype(na_object, coerce):
+    return get_dtype(na_object, coerce)
 
 
 # second copy for cast tests to do a cartesian product over dtypes
@@ -456,10 +460,40 @@ def test_sort(dtype, strings):
         ["", "a", "😸", "ááðfáíóåéë"],
     ],
 )
-def test_nonzero(strings):
-    arr = np.array(strings, dtype="T")
-    is_nonzero = np.array([i for i, item in enumerate(arr) if len(item) != 0])
+def test_nonzero(strings, na_object):
+    dtype = get_dtype(na_object)
+    arr = np.array(strings, dtype=dtype)
+    is_nonzero = np.array(
+        [i for i, item in enumerate(strings) if len(item) != 0])
     assert_array_equal(arr.nonzero()[0], is_nonzero)
+
+    if na_object is not pd_NA and na_object == 'unset':
+        return
+
+    strings_with_na = np.array(strings + [na_object], dtype=dtype)
+    is_nan = np.isnan(np.array([dtype.na_object], dtype=dtype))[0]
+
+    if is_nan:
+        assert strings_with_na.nonzero()[0][-1] == 4
+    else:
+        assert strings_with_na.nonzero()[0][-1] == 3
+
+    # check that the casting to bool and nonzero give consistent results
+    assert_array_equal(strings_with_na[strings_with_na.nonzero()],
+                       strings_with_na[strings_with_na.astype(bool)])
+
+
+def test_where(string_list, na_object):
+    dtype = get_dtype(na_object)
+    a = np.array(string_list, dtype=dtype)
+    b = a[::-1]
+    res = np.where([True, False, True, False, True, False], a, b)
+    assert_array_equal(res, [a[0], b[1], a[2], b[3], a[4], b[5]])
+
+
+def test_fancy_indexing(string_list):
+    sarr = np.array(string_list, dtype="T")
+    assert_array_equal(sarr, sarr[np.arange(sarr.shape[0])])
 
 
 def test_creation_functions():
@@ -468,6 +502,13 @@ def test_creation_functions():
 
     assert np.zeros(3, dtype="T")[0] == ""
     assert np.empty(3, dtype="T")[0] == ""
+
+
+def test_concatenate(string_list):
+    sarr = np.array(string_list, dtype="T")
+    sarr_cat = np.array(string_list + string_list, dtype="T")
+
+    assert_array_equal(np.concatenate([sarr], axis=0), sarr)
 
 
 def test_create_with_copy_none(string_list):
@@ -1080,7 +1121,13 @@ NAN_PRESERVING_FUNCTIONS = [
     "capitalize",
     "expandtabs",
     "lower",
-    "splitlines" "swapcase" "title" "upper",
+    "lstrip",
+    "rstrip",
+    "splitlines",
+    "strip",
+    "swapcase",
+    "title",
+    "upper",
 ]
 
 BOOL_OUTPUT_FUNCTIONS = [
@@ -1107,7 +1154,10 @@ UNARY_FUNCTIONS = [
     "istitle",
     "isupper",
     "lower",
+    "lstrip",
+    "rstrip",
     "splitlines",
+    "strip",
     "swapcase",
     "title",
     "upper",
@@ -1129,10 +1179,20 @@ UNIMPLEMENTED_VEC_STRING_FUNCTIONS = [
     "upper",
 ]
 
+ONLY_IN_NP_CHAR = [
+    "join",
+    "split",
+    "rsplit",
+    "splitlines"
+]
+
 
 @pytest.mark.parametrize("function_name", UNARY_FUNCTIONS)
 def test_unary(string_array, unicode_array, function_name):
-    func = getattr(np.char, function_name)
+    if function_name in ONLY_IN_NP_CHAR:
+        func = getattr(np.char, function_name)
+    else:
+        func = getattr(np.strings, function_name)
     dtype = string_array.dtype
     sres = func(string_array)
     ures = func(unicode_array)
@@ -1173,6 +1233,10 @@ def test_unary(string_array, unicode_array, function_name):
             with pytest.raises(ValueError):
                 func(na_arr)
         return
+    if not (is_nan or is_str):
+        with pytest.raises(ValueError):
+            func(na_arr)
+        return
     res = func(na_arr)
     if is_nan and function_name in NAN_PRESERVING_FUNCTIONS:
         assert res[0] is dtype.na_object
@@ -1197,24 +1261,33 @@ BINARY_FUNCTIONS = [
     ("index", (None, "e")),
     ("join", ("-", None)),
     ("ljust", (None, 12)),
+    ("lstrip", (None, "A")),
     ("partition", (None, "A")),
     ("replace", (None, "A", "B")),
     ("rfind", (None, "A")),
     ("rindex", (None, "e")),
     ("rjust", (None, 12)),
+    ("rsplit", (None, "A")),
+    ("rstrip", (None, "A")),
     ("rpartition", (None, "A")),
     ("split", (None, "A")),
+    ("strip", (None, "A")),
     ("startswith", (None, "A")),
     ("zfill", (None, 12)),
 ]
 
 PASSES_THROUGH_NAN_NULLS = [
     "add",
+    "center",
+    "ljust",
     "multiply",
     "replace",
+    "rjust",
     "strip",
     "lstrip",
     "rstrip",
+    "replace"
+    "zfill",
 ]
 
 NULLS_ARE_FALSEY = [
@@ -1226,7 +1299,6 @@ NULLS_ALWAYS_ERROR = [
     "count",
     "find",
     "rfind",
-    "replace",
 ]
 
 SUPPORTS_NULLS = (
@@ -1256,10 +1328,13 @@ def call_func(func, args, array, sanitize=True):
 
 @pytest.mark.parametrize("function_name, args", BINARY_FUNCTIONS)
 def test_binary(string_array, unicode_array, function_name, args):
-    func = getattr(np.char, function_name)
+    if function_name in ONLY_IN_NP_CHAR:
+        func = getattr(np.char, function_name)
+    else:
+        func = getattr(np.strings, function_name)
     sres = call_func(func, args, string_array)
     ures = call_func(func, args, unicode_array, sanitize=False)
-    if sres.dtype == StringDType():
+    if not isinstance(sres, tuple) and sres.dtype == StringDType():
         ures = ures.astype(StringDType())
     assert_array_equal(sres, ures)
 

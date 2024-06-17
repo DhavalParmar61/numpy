@@ -244,6 +244,8 @@ endforeach
 
 # variable attributes tested via "int %s a" % attribute
 optional_variable_attributes = [
+  ['thread_local', 'HAVE_THREAD_LOCAL'],
+  ['_Thread_local', 'HAVE__THREAD_LOCAL'],
   ['__thread', 'HAVE__THREAD'],
   ['__declspec(thread)', 'HAVE___DECLSPEC_THREAD_']
 ]
@@ -262,7 +264,7 @@ foreach optional_attr: optional_variable_attributes
       return 0;
     }
   '''
-  if cc.compiles(code)
+  if cc.compiles(code, name: optional_attr[0])
     cdata.set10(optional_attr[1], true)
   endif
 endforeach
@@ -1204,8 +1206,7 @@ py.extension_module('_multiarray_umath',
     src_numpy_api[1],  # __multiarray_api.h
     src_umath_doc_h,
     npy_math_internal_h,
-  ],
-  objects: svml_objects,
+  ] + svml_objects,
   c_args: c_args_common,
   cpp_args: cpp_args_common,
   include_directories: [

@@ -249,6 +249,12 @@ PyArray_CopyConverter(PyObject *obj, NPY_COPYMODE *copymode) {
             return NPY_FAIL;
         }
     }
+    else if(PyUnicode_Check(obj)) {
+        PyErr_SetString(PyExc_ValueError,
+                        "strings are not allowed for 'copy' keyword. "
+                        "Use True/False/None instead.");
+        return NPY_FAIL;
+    }
     else {
         npy_bool bool_copymode;
         if (!PyArray_BoolConverter(obj, &bool_copymode)) {
@@ -1197,7 +1203,7 @@ PyArray_IntpFromSequence(PyObject *seq, npy_intp *vals, int maxvals)
  * that it is in an unpickle context instead of a normal context without
  * evil global state like we create here.
  */
-NPY_NO_EXPORT int evil_global_disable_warn_O4O8_flag = 0;
+NPY_NO_EXPORT NPY_TLS int evil_global_disable_warn_O4O8_flag = 0;
 
 /*
  * Convert a gentype (that is actually a generic kind character) and
@@ -1341,13 +1347,19 @@ PyArray_TypestrConvert(int itemsize, int gentype)
             break;
 
         case NPY_DEPRECATED_STRINGLTR2:
-            DEPRECATE(
-                "Data type alias `a` was removed in NumPy 2.0. "
-                "Use `S` alias instead."
-            );
-            newtype = NPY_STRING;
+        {
+            /*
+             * raise a deprecation warning, which might be an exception
+             * if warnings are errors, so leave newtype unset in that
+             * case
+             */
+            int ret = DEPRECATE("Data type alias 'a' was deprecated in NumPy 2.0. "
+                                "Use the 'S' alias instead.");
+            if (ret == 0) {
+                newtype = NPY_STRING;
+            }
             break;
-
+        }
         case NPY_UNICODELTR:
             newtype = NPY_UNICODE;
             break;

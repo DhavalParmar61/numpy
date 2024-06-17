@@ -6,6 +6,8 @@
 #include <Python.h>
 #include <structmember.h>
 
+#include <errno.h>
+
 #include "numpy/arrayobject.h"
 #include "numpy/arrayscalars.h"
 #include "numpy/npy_math.h"
@@ -20,6 +22,7 @@
 #include "conversion_utils.h"  /* for PyArray_TypestrConvert */
 #include "templ_common.h" /* for npy_mul_sizes_with_overflow */
 #include "descriptor.h"
+#include "multiarraymodule.h"
 #include "alloc.h"
 #include "assert.h"
 #include "npy_buffer.h"
@@ -1806,19 +1809,27 @@ _convert_from_str(PyObject *obj, int align)
         /* Python byte string characters are unsigned */
         check_num = (unsigned char) type[0];
     }
-    /* A kind + size like 'f8' */
+    /* Possibly a kind + size like 'f8' but also could be 'bool' */
     else {
         char *typeend = NULL;
         int kind;
 
-        /* Parse the integer, make sure it's the rest of the string */
-        elsize = (int)strtol(type + 1, &typeend, 10);
-        /* Make sure size is not negative */
-        if (elsize < 0) {
+        /* Attempt to parse the integer, make sure it's the rest of the string */
+        errno = 0;
+        long result = strtol(type + 1, &typeend, 10);
+        npy_bool some_parsing_happened = !(type == typeend);
+        npy_bool entire_string_consumed = *typeend == '\0';
+        npy_bool parsing_succeeded =
+                (errno == 0) && some_parsing_happened && entire_string_consumed;
+        // make sure it doesn't overflow or go negative
+        if (result > INT_MAX || result < 0) {
             goto fail;
         }
 
-        if (typeend - type == len) {
+        elsize = (int)result;
+
+
+        if (parsing_succeeded && typeend - type == len) {
 
             kind = type[0];
             switch (kind) {
@@ -1827,10 +1838,10 @@ _convert_from_str(PyObject *obj, int align)
                     break;
 
                 case NPY_DEPRECATED_STRINGLTR2:
-                    DEPRECATE(
-                        "Data type alias `a` was removed in NumPy 2.0. "
-                        "Use `S` alias instead."
-                    );
+                    if (DEPRECATE("Data type alias 'a' was deprecated in NumPy 2.0. "
+                                  "Use the 'S' alias instead.") < 0) {
+                        return NULL;
+                    }
                     check_num = NPY_STRING;
                     break;
 
@@ -1863,6 +1874,9 @@ _convert_from_str(PyObject *obj, int align)
                         elsize = 0;
                     }
             }
+        }
+        else if (parsing_succeeded) {
+            goto fail;
         }
     }
 
@@ -1899,10 +1913,10 @@ _convert_from_str(PyObject *obj, int align)
         }
 
         if (strcmp(type, "a") == 0) {
-            DEPRECATE(
-                "Data type alias `a` was removed in NumPy 2.0. "
-                "Use `S` alias instead."
-            );
+            if (DEPRECATE("Data type alias 'a' was deprecated in NumPy 2.0. "
+                          "Use the 'S' alias instead.") < 0) {
+                return NULL;
+            }
         }
 
         /*
@@ -2024,6 +2038,8 @@ arraydescr_dealloc(PyArray_Descr *self)
 {
     Py_XDECREF(self->typeobj);
     if (!PyDataType_ISLEGACY(self)) {
+        /* non legacy dtypes must not have fields, etc. */
+        Py_TYPE(self)->tp_free((PyObject *)self);
         return;
     }
     _PyArray_LegacyDescr *lself = (_PyArray_LegacyDescr *)self;
@@ -2701,7 +2717,7 @@ arraydescr_reduce(PyArray_Descr *self, PyObject *NPY_UNUSED(args))
         Py_DECREF(ret);
         return NULL;
     }
-    obj = PyObject_GetAttrString(mod, "dtype");
+    obj = PyObject_GetAttr(mod, npy_ma_str_dtype);
     Py_DECREF(mod);
     if (obj == NULL) {
         Py_DECREF(ret);

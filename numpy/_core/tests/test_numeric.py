@@ -165,6 +165,58 @@ class TestNonarrayArgs:
         tgt = [[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12]]
         assert_equal(np.reshape(arr, (2, 6)), tgt)
 
+    def test_reshape_shape_arg(self):
+        arr = np.arange(12)
+        shape = (3, 4)
+        expected = arr.reshape(shape)
+
+        with pytest.raises(
+            TypeError,
+            match="You cannot specify 'newshape' and 'shape' "
+                  "arguments at the same time."
+        ):
+            np.reshape(arr, shape=shape, newshape=shape)
+        with pytest.raises(
+            TypeError,
+            match=r"reshape\(\) missing 1 required positional "
+                  "argument: 'shape'"
+        ):
+            np.reshape(arr)
+
+        assert_equal(np.reshape(arr, shape), expected)
+        assert_equal(np.reshape(arr, shape, order="C"), expected)
+        assert_equal(np.reshape(arr, shape=shape), expected)
+        assert_equal(np.reshape(arr, shape=shape, order="C"), expected)
+        with pytest.warns(DeprecationWarning):
+            actual = np.reshape(arr, newshape=shape)
+            assert_equal(actual, expected)
+
+    def test_reshape_copy_arg(self):
+        arr = np.arange(24).reshape(2, 3, 4)
+        arr_f_ord = np.array(arr, order="F")
+        shape = (12, 2)
+
+        assert np.shares_memory(np.reshape(arr, shape), arr)
+        assert np.shares_memory(np.reshape(arr, shape, order="C"), arr)
+        assert np.shares_memory(
+            np.reshape(arr_f_ord, shape, order="F"), arr_f_ord)
+        assert np.shares_memory(np.reshape(arr, shape, copy=None), arr)
+        assert np.shares_memory(np.reshape(arr, shape, copy=False), arr)
+        assert np.shares_memory(arr.reshape(shape, copy=False), arr)
+        assert not np.shares_memory(np.reshape(arr, shape, copy=True), arr)
+        assert not np.shares_memory(
+            np.reshape(arr, shape, order="C", copy=True), arr)
+        assert not np.shares_memory(
+            np.reshape(arr, shape, order="F", copy=True), arr)
+        assert not np.shares_memory(
+            np.reshape(arr, shape, order="F", copy=None), arr)
+
+        err_msg = "Unable to avoid creating a copy while reshaping."
+        with pytest.raises(ValueError, match=err_msg):
+            np.reshape(arr, shape, order="F", copy=False)
+        with pytest.raises(ValueError, match=err_msg):
+            np.reshape(arr_f_ord, shape, order="C", copy=False)
+
     def test_round(self):
         arr = [1.56, 72.54, 6.35, 3.25]
         tgt = [1.6, 72.5, 6.4, 3.2]
@@ -271,6 +323,18 @@ class TestNonarrayArgs:
 
         out = np.take(a, indices)
         assert_equal(out, tgt)
+
+        pairs = [
+            (np.int32, np.int32), (np.int32, np.int64),
+            (np.int64, np.int32), (np.int64, np.int64)
+        ]
+        for array_type, indices_type in pairs:
+            x = np.array([1, 2, 3, 4, 5], dtype=array_type)
+            ind = np.array([0, 2, 2, 3], dtype=indices_type)
+            tgt = np.array([1, 3, 3, 4], dtype=array_type)
+            out = np.take(x, ind)
+            assert_equal(out, tgt)
+            assert_equal(out.dtype, tgt.dtype)  
 
     def test_trace(self):
         c = [[1, 2], [3, 4], [5, 6]]
@@ -1439,6 +1503,17 @@ class TestTypes:
             fi = np.finfo(dt)
             assert_(np.can_cast(fi.min, dt))
             assert_(np.can_cast(fi.max, dt))
+
+    @pytest.mark.parametrize("dtype",
+            list("?bhilqBHILQefdgFDG") + [rational])
+    def test_can_cast_scalars(self, dtype):
+        # Basic test to ensure that scalars are supported in can-cast
+        # (does not check behavior exhaustively).
+        dtype = np.dtype(dtype)
+        scalar = dtype.type(0)
+
+        assert np.can_cast(scalar, "int64") == np.can_cast(dtype, "int64")
+        assert np.can_cast(scalar, "float32", casting="unsafe")
 
 
 # Custom exception class to test exception propagation in fromiter

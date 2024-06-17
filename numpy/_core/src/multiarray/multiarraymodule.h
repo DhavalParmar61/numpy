@@ -19,6 +19,8 @@ NPY_VISIBILITY_HIDDEN extern PyObject * npy_ma_str_convert;
 NPY_VISIBILITY_HIDDEN extern PyObject * npy_ma_str_preserve;
 NPY_VISIBILITY_HIDDEN extern PyObject * npy_ma_str_convert_if_no_array;
 NPY_VISIBILITY_HIDDEN extern PyObject * npy_ma_str_cpu;
+NPY_VISIBILITY_HIDDEN extern PyObject * npy_ma_str_dtype;
 NPY_VISIBILITY_HIDDEN extern PyObject * npy_ma_str_array_err_msg_substr;
+NPY_VISIBILITY_HIDDEN extern PyObject * npy_ma_str___dlpack__;
 
 #endif  /* NUMPY_CORE_SRC_MULTIARRAY_MULTIARRAYMODULE_H_ */
