@@ -199,24 +199,16 @@ class TestDatetimeEvent(_DeprecationTestCase):
             self.assert_deprecated(cls, args=(1, ('ms', 2, 1, 63)))
 
 
-class TestTruthTestingEmptyArrays(_DeprecationTestCase):
-    # 2017-09-25, 1.14.0
-    message = '.*truth value of an empty array is ambiguous.*'
-
-    def test_1d(self):
-        self.assert_deprecated(bool, args=(np.array([]),))
-
-    def test_2d(self):
-        self.assert_deprecated(bool, args=(np.zeros((1, 0)),))
-        self.assert_deprecated(bool, args=(np.zeros((0, 1)),))
-        self.assert_deprecated(bool, args=(np.zeros((0, 0)),))
-
-
 class TestBincount(_DeprecationTestCase):
     # 2017-06-01, 1.14.0
     def test_bincount_minlength(self):
         self.assert_deprecated(lambda: np.bincount([1, 2, 3], minlength=None))
 
+    # 2024-07-29, 2.1.0
+    @pytest.mark.parametrize('badlist', [[0.5, 1.2, 1.5],
+                                         ['0', '1', '1']])
+    def test_bincount_bad_list(self, badlist):
+        self.assert_deprecated(lambda: np.bincount(badlist))
 
 
 class TestGeneratorSum(_DeprecationTestCase):

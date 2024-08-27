@@ -127,6 +127,7 @@ def poly2herme(pol):
 
     Examples
     --------
+    >>> import numpy as np
     >>> from numpy.polynomial.hermite_e import poly2herme
     >>> poly2herme(np.arange(4))
     array([  2.,  10.,   2.,   3.])
@@ -1137,6 +1138,7 @@ def hermevander(x, deg):
 
     Examples
     --------
+    >>> import numpy as np
     >>> from numpy.polynomial.hermite_e import hermevander
     >>> x = np.array([-1, 0, 1])
     >>> hermevander(x, 3)
@@ -1389,6 +1391,7 @@ def hermefit(x, y, deg, rcond=None, full=False, w=None):
 
     Examples
     --------
+    >>> import numpy as np
     >>> from numpy.polynomial.hermite_e import hermefit, hermeval
     >>> x = np.linspace(-10, 10)
     >>> rng = np.random.default_rng()
@@ -1667,9 +1670,9 @@ class HermiteE(ABCPolyBase):
     domain : (2,) array_like, optional
         Domain to use. The interval ``[domain[0], domain[1]]`` is mapped
         to the interval ``[window[0], window[1]]`` by shifting and scaling.
-        The default value is [-1, 1].
+        The default value is [-1., 1.].
     window : (2,) array_like, optional
-        Window, see `domain` for its use. The default value is [-1, 1].
+        Window, see `domain` for its use. The default value is [-1., 1.].
 
         .. versionadded:: 1.6.0
     symbol : str, optional

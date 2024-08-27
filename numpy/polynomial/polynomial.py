@@ -729,6 +729,7 @@ def polyval(x, c, tensor=True):
 
     Examples
     --------
+    >>> import numpy as np
     >>> from numpy.polynomial.polynomial import polyval
     >>> polyval(1, [1,2,3])
     6.0
@@ -1207,6 +1208,8 @@ def polyvander2d(x, y, deg):
 
     Examples
     --------
+    >>> import numpy as np
+
     The 2-D pseudo-Vandermonde matrix of degree ``[1, 2]`` and sample
     points ``x = [-1, 2]`` and ``y = [1, 3]`` is as follows:
 
@@ -1290,6 +1293,7 @@ def polyvander3d(x, y, z, deg):
 
     Examples
     --------
+    >>> import numpy as np
     >>> from numpy.polynomial import polynomial as P
     >>> x = np.asarray([-1, 2, 1])
     >>> y = np.asarray([1, -2, -3])
@@ -1441,6 +1445,7 @@ def polyfit(x, y, deg, rcond=None, full=False, w=None):
 
     Examples
     --------
+    >>> import numpy as np
     >>> from numpy.polynomial import polynomial as P
     >>> x = np.linspace(-1,1,51)  # x "data": [-1, -0.96, ..., 0.96, 1]
     >>> rng = np.random.default_rng()
@@ -1463,7 +1468,7 @@ def polyfit(x, y, deg, rcond=None, full=False, w=None):
     array([-6.73496154e-17, -1.00000000e+00,  0.00000000e+00,  1.00000000e+00])
     >>> stats # note the minuscule SSR
     [array([8.79579319e-31]),
-     4,
+     np.int32(4),
      array([1.38446749, 1.32119158, 0.50443316, 0.28853036]),
      1.1324274851176597e-14]
 
@@ -1601,9 +1606,9 @@ class Polynomial(ABCPolyBase):
     domain : (2,) array_like, optional
         Domain to use. The interval ``[domain[0], domain[1]]`` is mapped
         to the interval ``[window[0], window[1]]`` by shifting and scaling.
-        The default value is [-1, 1].
+        The default value is [-1., 1.].
     window : (2,) array_like, optional
-        Window, see `domain` for its use. The default value is [-1, 1].
+        Window, see `domain` for its use. The default value is [-1., 1.].
 
         .. versionadded:: 1.6.0
     symbol : str, optional
